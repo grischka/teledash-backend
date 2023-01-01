@@ -112,6 +112,7 @@ class TelegramAuthenticator:
         phone_number: str,
         phone_code_hash: str,
         phone_code: str,
+        password: Optional[str],
     ) -> SignInResponse:
         """
         Finish Telegram authentication process (sign in) and
@@ -128,8 +129,13 @@ class TelegramAuthenticator:
 
         tg_client = self.get_client(client_id)["tg_client"]
 
+        if password:
+            try:
+                user = await tg_client.check_password(password)
+            except Exception as e:
+                raise ValueError(e)
+
         try:
-            # TODO: Handle SessionPasswordNeeded (2FA)
             user = await tg_client.sign_in(
                 phone_number=phone_number,
                 phone_code_hash=phone_code_hash,

@@ -136,6 +136,7 @@ def get_clients_router(app):
                 phone_number=client_doc.phone_number,
                 phone_code_hash=session.phone_code_hash,
                 phone_code=session.phone_code,
+                password=session.password,
             )
         except Exception as e:
             print(e)
