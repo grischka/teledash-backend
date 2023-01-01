@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
-from typing import Dict, TypedDict
+from typing import Dict, Optional, TypedDict
 
-from pyrogram import Client as TelegramClient
+from pyrogram.client import Client as TelegramClient
 from pyrogram.errors.exceptions import BadRequest
 from pyrogram.errors.exceptions.unauthorized_401 import SessionPasswordNeeded
 from pyrogram.types.authorization.sent_code import SentCode
@@ -10,6 +10,10 @@ from pyrogram.types.user_and_chats.user import User
 # Full pyrogram error reference: https://docs.pyrogram.org/api/errors/
 
 authenticator = None
+
+# Enable or disable login to the Telegram test servers.
+# Reference: https://docs.pyrogram.org/topics/test-servers
+TELEGRAM_TEST_MODE = False
 
 
 class MapEntry(TypedDict):
@@ -67,7 +71,6 @@ class TelegramAuthenticator:
         api_id: int,
         api_hash: str,
         phone_number: str,
-        test_mode: bool = False,
     ) -> SentCode:
         """
         Start Telegram authentication process and send login
@@ -80,23 +83,24 @@ class TelegramAuthenticator:
             await self.remove_client(client_id)
 
         tg_client = TelegramClient(
-            ":memory:",
+            client_id,
             api_id=api_id,
             api_hash=api_hash,
             phone_number=phone_number,
-            test_mode=test_mode,
+            test_mode=TELEGRAM_TEST_MODE,
             no_updates=True,
+            in_memory=True,
         )
         result = None
         await tg_client.connect()
 
         try:
             result = await tg_client.send_code(phone_number=phone_number)
-        except BadRequest:
+        except BadRequest as e:
             if tg_client.is_connected:
                 await tg_client.disconnect()
 
-            raise ValueError("Phone number is invalid")
+            raise ValueError(e)
 
         self.add_client(client_id, tg_client)
 
@@ -131,10 +135,12 @@ class TelegramAuthenticator:
                 phone_code_hash=phone_code_hash,
                 phone_code=phone_code,
             )
-        except BadRequest:
-            raise ValueError("Bad arguments")
-        except SessionPasswordNeeded:
-            raise Exception("Password is needed to sign in")
+        except BadRequest as e:
+            raise ValueError(e)
+        except SessionPasswordNeeded as e:
+            raise Exception(e)
+        except Exception as e:
+            raise e
 
         if not isinstance(user, User):
             # accepting TOS not implemented
